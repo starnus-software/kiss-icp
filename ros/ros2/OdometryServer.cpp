@@ -34,7 +34,6 @@
 #include "kiss_icp/pipeline/KissICP.hpp"
 
 // ROS 2 headers
-#include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -57,19 +56,47 @@ OdometryServer::OdometryServer(const rclcpp::NodeOptions &options)
     // clang-format off
     base_frame_ = declare_parameter<std::string>("base_frame", base_frame_);
     odom_frame_ = declare_parameter<std::string>("odom_frame", odom_frame_);
+    enable_static_transformation_ = true;
+    map_frame_ = declare_parameter<std::string>("map_frame", map_frame_);
     publish_odom_tf_ = declare_parameter<bool>("publish_odom_tf", publish_odom_tf_);
     publish_debug_clouds_ = declare_parameter<bool>("visualize", publish_debug_clouds_);
-    config_.max_range = declare_parameter<double>("max_range", config_.max_range);
-    config_.min_range = declare_parameter<double>("min_range", config_.min_range);
+    config_.max_range = 30.0;
+    config_.min_range = 0.5;
     config_.deskew = declare_parameter<bool>("deskew", config_.deskew);
     config_.voxel_size = declare_parameter<double>("voxel_size", config_.max_range / 100.0);
     config_.max_points_per_voxel = declare_parameter<int>("max_points_per_voxel", config_.max_points_per_voxel);
     config_.initial_threshold = declare_parameter<double>("initial_threshold", config_.initial_threshold);
     config_.min_motion_th = declare_parameter<double>("min_motion_th", config_.min_motion_th);
+    initial_position_x = declare_parameter<double>("initial_position_x", initial_position_x);
+    initial_position_y = declare_parameter<double>("initial_position_y", initial_position_y);
+    initial_position_z = declare_parameter<double>("initial_position_z", initial_position_z);
+    initial_angle_x = declare_parameter<double>("initial_angle_x", initial_angle_x);
+    initial_angle_y = declare_parameter<double>("initial_angle_y", initial_angle_y);
+    initial_angle_z = declare_parameter<double>("initial_angle_z", initial_angle_z);
+    initial_angle_w = declare_parameter<double>("initial_angle_w", initial_angle_w);
+
+    static_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(*this);
+    geometry_msgs::msg::TransformStamped transform_msg_odom_map;
+    transform_msg_odom_map.header.frame_id = map_frame_;
+    transform_msg_odom_map.child_frame_id = odom_frame_;
+    transform_msg_odom_map.transform.translation.x = initial_position_x;
+    transform_msg_odom_map.transform.translation.y = initial_position_y;
+    transform_msg_odom_map.transform.translation.z = initial_position_z;
+    transform_msg_odom_map.transform.rotation.x = initial_angle_x;
+    transform_msg_odom_map.transform.rotation.y = initial_angle_y;
+    transform_msg_odom_map.transform.rotation.z = initial_angle_z;
+    transform_msg_odom_map.transform.rotation.w = initial_angle_w;
+
+    static_broadcaster_->sendTransform(transform_msg_odom_map);
+
     if (config_.max_range < config_.min_range) {
         RCLCPP_WARN(get_logger(), "[WARNING] max_range is smaller than min_range, settng min_range to 0.0");
         config_.min_range = 0.0;
     }
+    std::cout<<"Base Frame: "<<base_frame_<<std::endl;
+    std::cout<<"odom_frame_: "<<odom_frame_<<std::endl;
+    std::cout<<" initial_position_x: "<<initial_position_x<<std::endl;
+    std::cout<<"publish_odom_tf_: "<<publish_odom_tf_<<std::endl;
     // clang-format on
 
     // Construct the main KISS-ICP odometry node
@@ -77,8 +104,11 @@ OdometryServer::OdometryServer(const rclcpp::NodeOptions &options)
 
     // Initialize subscribers
     pointcloud_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-        "pointcloud_topic", rclcpp::SensorDataQoS(),
+        "/kiss_icp_merged_cloud", rclcpp::SensorDataQoS(),
         std::bind(&OdometryServer::RegisterFrame, this, std::placeholders::_1));
+    service_ = create_service<std_srvs::srv::Trigger>(
+        "stop_node", std::bind(&OdometryServer::handleTriggerService, this,
+                                     std::placeholders::_1, std::placeholders::_2));
 
     // Initialize publishers
     rclcpp::QoS qos((rclcpp::SystemDefaultsQoS().keep_last(1).durability_volatile()));
@@ -94,6 +124,7 @@ OdometryServer::OdometryServer(const rclcpp::NodeOptions &options)
 
     // Initialize the transform broadcaster
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+
     tf2_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf2_buffer_->setUsingDedicatedThread(true);
     tf2_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf2_buffer_);
@@ -133,7 +164,8 @@ void OdometryServer::RegisterFrame(const sensor_msgs::msg::PointCloud2::ConstSha
     // Compute the pose using KISS, ego-centric to the LiDAR
     const Sophus::SE3d kiss_pose = odometry_.poses().back();
 
-    // If necessary, transform the ego-centric pose to the specified base_link/base_footprint frame
+    // If necessary, transform the ego-centric pose to the specified base_link/base_footprint
+    // frame
     const auto pose = [&]() -> Sophus::SE3d {
         if (egocentric_estimation) return kiss_pose;
         const Sophus::SE3d cloud2base = LookupTransform(base_frame_, cloud_frame_id);
@@ -213,7 +245,19 @@ void OdometryServer::PublishClouds(const std::vector<Eigen::Vector3d> frame,
         map_publisher_->publish(std::move(EigenToPointCloud2(kiss_map, odom_header)));
     }
 }
-}  // namespace kiss_icp_ros
+ // namespace kiss_icp_ros
+bool OdometryServer::handleTriggerService(const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                              std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
+    RCLCPP_INFO(this->get_logger(), "Trigger service called.");
 
+    // Customize the response message
+    response->message = "Service triggered successfully.";
+    rclcpp::shutdown();
+
+    return true;
+  }
+
+}
 #include "rclcpp_components/register_node_macro.hpp"
 RCLCPP_COMPONENTS_REGISTER_NODE(kiss_icp_ros::OdometryServer)

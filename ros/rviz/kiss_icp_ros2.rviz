@@ -209,12 +209,12 @@ Visualization Manager:
       Length: 1
       Name: odom_frame
       Radius: 0.10000000149011612
-      Reference Frame: odom
+      Reference Frame: kiss_icp_map
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: odom
+    Fixed Frame: kiss_icp_map
     Frame Rate: 30
   Name: root
   Tools:

@@ -38,45 +38,38 @@ def generate_launch_description():
     return LaunchDescription(
         [
             # ROS 2 parameters
-            DeclareLaunchArgument("topic", description="sensor_msg/PointCloud2 topic to process"),
+            DeclareLaunchArgument(
+                "rmw_implementation",
+                default_value="rmw_cyclonedds_cpp",
+                description="The RMW implementation to use (e.g., rmw_cyclonedds_cpp).",
+            ),
+            DeclareLaunchArgument(
+                "topic",
+                default_value="/kiss_icp_merged_cloud",
+                description="sensor_msg/PointCloud2 topic to process",
+            ),
             DeclareLaunchArgument("bagfile", default_value=""),
             DeclareLaunchArgument("visualize", default_value="true"),
-            DeclareLaunchArgument("odom_frame", default_value="odom"),
-            DeclareLaunchArgument("base_frame", default_value=""),
-            DeclareLaunchArgument("publish_odom_tf", default_value="true"),
+            DeclareLaunchArgument("odom_frame", default_value="kiss_icp_odom"),
+            DeclareLaunchArgument("map_frame", default_value="kiss_icp_map"),
+            DeclareLaunchArgument(
+                "base_frame", default_value="kiss_icp_frame_base_link"
+            ),
+            DeclareLaunchArgument("publish_odom_tf", default_value="publish_odom_tf"),
             # KISS-ICP parameters
             DeclareLaunchArgument("deskew", default_value="false"),
-            DeclareLaunchArgument("max_range", default_value="100.0"),
-            DeclareLaunchArgument("min_range", default_value="5.0"),
+            DeclareLaunchArgument("max_range", default_value="30.0"),
+            DeclareLaunchArgument("min_range", default_value="0.5"),
             # This thing is still not suported: https://github.com/ros2/launch/issues/290#issuecomment-1438476902
             #  DeclareLaunchArgument("voxel_size", default_value=None),
-            Node(
-                package="kiss_icp",
-                executable="odometry_node",
-                name="odometry_node",
-                output="screen",
-                remappings=[("pointcloud_topic", LaunchConfiguration("topic"))],
-                parameters=[
-                    {
-                        "odom_frame": LaunchConfiguration("odom_frame"),
-                        "base_frame": LaunchConfiguration("base_frame"),
-                        "max_range": LaunchConfiguration("max_range"),
-                        "min_range": LaunchConfiguration("min_range"),
-                        "deskew": LaunchConfiguration("deskew"),
-                        #  "voxel_size": LaunchConfiguration("voxel_size"),
-                        "max_points_per_voxel": 20,
-                        "initial_threshold": 2.0,
-                        "min_motion_th": 0.1,
-                        "publish_odom_tf": LaunchConfiguration("publish_odom_tf"),
-                        "visualize": LaunchConfiguration("visualize"),
-                    }
-                ],
-            ),
             Node(
                 package="rviz2",
                 executable="rviz2",
                 output={"both": "log"},
-                arguments=["-d", PathJoinSubstitution([current_pkg, "rviz", "kiss_icp_ros2.rviz"])],
+                arguments=[
+                    "-d",
+                    PathJoinSubstitution([current_pkg, "rviz", "kiss_icp_ros2.rviz"]),
+                ],
                 condition=IfCondition(LaunchConfiguration("visualize")),
             ),
             ExecuteProcess(

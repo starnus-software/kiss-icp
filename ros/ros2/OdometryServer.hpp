@@ -27,14 +27,18 @@
 
 // ROS 2
 #include <tf2_ros/buffer.h>
+#include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
+#include <geometry_msgs/msg/transform.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <starnus_msgs/msg/perform_localization.hpp>
 #include <string>
+#include "std_srvs/srv/trigger.hpp"
 
 namespace kiss_icp_ros {
 
@@ -47,6 +51,9 @@ public:
 private:
     /// Register new frame
     void RegisterFrame(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &msg);
+    void PerformLocalization(const starnus_msgs::msg::PerformLocalization::ConstSharedPtr &msg);
+    bool handleTriggerService(const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+                              std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
     /// Stream the estimated pose to ROS
     void PublishOdometry(const Sophus::SE3d &pose,
@@ -66,6 +73,7 @@ private:
 private:
     /// Tools for broadcasting TFs.
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+    std::unique_ptr<tf2_ros::StaticTransformBroadcaster> static_broadcaster_;
     std::unique_ptr<tf2_ros::Buffer> tf2_buffer_;
     std::unique_ptr<tf2_ros::TransformListener> tf2_listener_;
     bool publish_odom_tf_;
@@ -73,12 +81,14 @@ private:
 
     /// Data subscribers.
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
+    rclcpp::Subscription<starnus_msgs::msg::PerformLocalization>::SharedPtr localize_sub_;
 
     /// Data publishers.
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr frame_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr kpoints_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_publisher_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_;
 
     /// Path publisher
     nav_msgs::msg::Path path_msg_;
@@ -87,10 +97,13 @@ private:
     /// KISS-ICP
     kiss_icp::pipeline::KissICP odometry_;
     kiss_icp::pipeline::KISSConfig config_;
-
+    double initial_position_x, initial_position_y, initial_position_z;
+    double initial_angle_x, initial_angle_y, initial_angle_z, initial_angle_w;
+    bool perform_localization_, enable_static_transformation_;
     /// Global/map coordinate frame.
     std::string odom_frame_{"odom"};
     std::string base_frame_{};
+    std::string map_frame_{"map"};
 };
 
 }  // namespace kiss_icp_ros
