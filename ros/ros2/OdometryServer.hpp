@@ -36,7 +36,6 @@
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include <starnus_msgs/msg/perform_localization.hpp>
 #include <string>
 #include "std_srvs/srv/trigger.hpp"
 
@@ -51,7 +50,7 @@ public:
 private:
     /// Register new frame
     void RegisterFrame(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &msg);
-    void PerformLocalization(const starnus_msgs::msg::PerformLocalization::ConstSharedPtr &msg);
+
     bool handleTriggerService(const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
                               std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
@@ -81,7 +80,7 @@ private:
 
     /// Data subscribers.
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
-    rclcpp::Subscription<starnus_msgs::msg::PerformLocalization>::SharedPtr localize_sub_;
+
 
     /// Data publishers.
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
@@ -99,7 +98,7 @@ private:
     kiss_icp::pipeline::KISSConfig config_;
     double initial_position_x, initial_position_y, initial_position_z;
     double initial_angle_x, initial_angle_y, initial_angle_z, initial_angle_w;
-    bool perform_localization_, enable_static_transformation_;
+    bool enable_static_transformation_;
     /// Global/map coordinate frame.
     std::string odom_frame_{"odom"};
     std::string base_frame_{};
