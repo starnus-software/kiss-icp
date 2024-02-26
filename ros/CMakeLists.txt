@@ -45,7 +45,6 @@ if("$ENV{ROS_VERSION}" STREQUAL "1")
   find_package(
     catkin REQUIRED
     COMPONENTS 
-               starnus_msgs
                geometry_msgs
                nav_msgs
                sensor_msgs
@@ -69,7 +68,6 @@ elseif("$ENV{ROS_VERSION}" STREQUAL "2")
   message(STATUS "KISS-ICP ROS 2 wrapper will be compiled")
 
   find_package(ament_cmake REQUIRED)
-  find_package(starnus_msgs REQUIRED)
   find_package(std_srvs REQUIRED)
   find_package(nav_msgs REQUIRED)
   find_package(rcutils REQUIRED)
@@ -92,7 +90,6 @@ elseif("$ENV{ROS_VERSION}" STREQUAL "2")
     rclcpp_lifecycle
     nav_msgs
     sensor_msgs
-    starnus_msgs
     std_srvs
     geometry_msgs
     tf2_ros)
